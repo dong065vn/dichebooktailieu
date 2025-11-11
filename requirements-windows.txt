@@ -1,0 +1,33 @@
+# Requirements for Windows (No Rust compilation needed)
+# Dùng file này nếu gặp lỗi pydantic-core compilation
+
+# Core LLM Providers
+anthropic>=0.25.0
+openai>=1.14.0
+google-generativeai>=0.4.1
+cohere>=5.1.0
+groq>=0.5.0
+
+# Pydantic - Use version that doesn't require Rust
+pydantic>=2.0.0,<3.0.0
+
+# File Format Handlers
+python-docx>=1.1.0
+PyPDF2>=3.0.1
+ebooklib>=0.18
+beautifulsoup4>=4.12.0
+
+# Web UI
+gradio>=4.19.0
+streamlit>=1.31.0
+
+# Utilities
+requests>=2.31.0
+tqdm>=4.66.0
+colorama>=0.4.6
+python-dotenv>=1.0.0
+pillow>=10.0.0
+
+# Optional: For better performance
+# aiohttp>=3.9.0
+# httpx>=0.26.0

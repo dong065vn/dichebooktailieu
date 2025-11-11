@@ -102,6 +102,22 @@ pip install PyPDF2 pdfplumber
 pip install -r requirements.txt
 ```
 
+### 🪟 Cài Đặt Trên Windows
+
+Nếu gặp lỗi `pydantic-core` compilation trên Windows:
+
+```bash
+# Quick fix - Dùng auto installer
+install_windows.bat
+
+# Hoặc manual fix
+pip install --upgrade pip
+pip install --only-binary :all: pydantic pydantic-core
+pip install -r requirements-windows.txt
+```
+
+**Chi tiết**: Xem **[WINDOWS_INSTALL_FIX.md](WINDOWS_INSTALL_FIX.md)** để biết 4 cách fix lỗi Windows
+
 ## 📖 Sử Dụng
 
 ### 1. CLI (Command Line Interface)
