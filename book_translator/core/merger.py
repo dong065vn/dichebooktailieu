@@ -36,7 +36,7 @@ class SmartMerger:
 
         Args:
             chunks: List các TextChunk gốc
-            translations: List các bản dịch tương ứng
+            translations: List các bản dịch tương ứng (có thể có None cho failed chunks)
 
         Returns:
             Văn bản đã dịch hoàn chỉnh
@@ -46,11 +46,23 @@ class SmartMerger:
                 f"Mismatch: {len(chunks)} chunks but {len(translations)} translations"
             )
 
-        logger.info(f"Merging {len(chunks)} translated chunks")
+        # Count skipped chunks
+        skipped = sum(1 for t in translations if t is None)
+        if skipped > 0:
+            logger.warning(
+                f"⚠️ Skipping {skipped} failed chunks - "
+                f"Output sẽ thiếu {skipped} đoạn!"
+            )
+
+        logger.info(f"Merging {len(chunks) - skipped}/{len(chunks)} translated chunks")
 
         result_parts = []
 
         for i, (chunk, translation) in enumerate(zip(chunks, translations)):
+            # NEW: Skip None translations (failed chunks)
+            if translation is None:
+                logger.debug(f"Skipping chunk {i} (translation failed)")
+                continue
             # Clean up translation
             clean_translation = self._clean_translation(translation)
 

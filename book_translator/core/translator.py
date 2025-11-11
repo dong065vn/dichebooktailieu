@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 from .chunker import IntelligentChunker, TextChunk
 from .merger import SmartMerger
+from .quota_handler import QuotaHandler, ProgressSaver
 from ..llm_providers.base import BaseLLMProvider
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,10 @@ class BookTranslator:
         max_chunk_size: int = 3000,
         min_chunk_size: int = 500,
         context_size: int = 300,
-        show_progress: bool = True
+        show_progress: bool = True,
+        skip_failed_chunks: bool = True,  # NEW: Skip thay vì ghi error
+        save_progress: bool = True,  # NEW: Save progress để resume
+        handle_quota_errors: bool = True  # NEW: Xử lý quota errors
     ):
         """
         Args:
@@ -41,10 +45,16 @@ class BookTranslator:
             min_chunk_size: Kích thước tối thiểu của chunk
             context_size: Số ký tự context từ chunk trước
             show_progress: Hiển thị progress bar
+            skip_failed_chunks: True = skip failed chunks, False = ghi error vào output
+            save_progress: True = save progress để resume sau, False = không save
+            handle_quota_errors: True = xử lý quota errors thông minh
         """
         self.llm_provider = llm_provider
         self.max_workers = max_workers
         self.show_progress = show_progress
+        self.skip_failed_chunks = skip_failed_chunks
+        self.save_progress = save_progress
+        self.handle_quota_errors = handle_quota_errors
 
         self.chunker = IntelligentChunker(
             max_chunk_size=max_chunk_size,
@@ -54,10 +64,21 @@ class BookTranslator:
 
         self.merger = SmartMerger()
 
+        # NEW: Quota handler
+        if self.handle_quota_errors:
+            self.quota_handler = QuotaHandler(
+                max_quota_retries=5,
+                quota_retry_delay=60
+            )
+        else:
+            self.quota_handler = None
+
         self.stats = {
             'total_chunks': 0,
             'successful_chunks': 0,
             'failed_chunks': 0,
+            'skipped_chunks': 0,  # NEW
+            'quota_errors': 0,  # NEW
             'total_chars': 0,
             'start_time': None,
             'end_time': None,
@@ -155,8 +176,33 @@ class BookTranslator:
                         callback(chunk.id, len(chunks), translation)
 
                 except Exception as e:
-                    logger.error(f"Failed to translate chunk {chunk.id}: {e}")
-                    translations[chunk.id] = f"[TRANSLATION FAILED: {str(e)}]"
+                    error_msg = str(e)
+                    logger.error(f"Failed to translate chunk {chunk.id}: {error_msg}")
+
+                    # NEW: Check if quota error
+                    quota_error = None
+                    if self.quota_handler:
+                        quota_error = self.quota_handler.is_quota_error(error_msg)
+
+                    if quota_error:
+                        self.stats['quota_errors'] += 1
+                        logger.warning(f"⚠️ Quota error detected: {quota_error.error_type}")
+
+                        # Show suggestions
+                        suggestions = self.quota_handler.get_suggestions(quota_error)
+                        logger.warning("💡 Suggestions:")
+                        for suggestion in suggestions:
+                            logger.warning(f"   {suggestion}")
+
+                    # Set failed chunk value
+                    if self.skip_failed_chunks:
+                        # Skip: không ghi gì (sẽ filter khi merge)
+                        translations[chunk.id] = None
+                        self.stats['skipped_chunks'] += 1
+                    else:
+                        # Ghi error message vào output (old behavior)
+                        translations[chunk.id] = f"[TRANSLATION FAILED: {error_msg}]"
+
                     failed_chunks.append(chunk.id)
                     self.stats['failed_chunks'] += 1
 
@@ -203,7 +249,9 @@ class BookTranslator:
         source_lang: str,
         target_lang: str
     ):
-        """Retry các chunks bị fail"""
+        """Retry các chunks bị fail với quota handling"""
+        retry_attempt = 1
+
         for chunk_id in failed_ids:
             try:
                 chunk = chunks[chunk_id]
@@ -213,9 +261,58 @@ class BookTranslator:
                 translations[chunk_id] = translation
                 self.stats['successful_chunks'] += 1
                 self.stats['failed_chunks'] -= 1
-                logger.info(f"Successfully retried chunk {chunk_id}")
+                if self.skip_failed_chunks:
+                    self.stats['skipped_chunks'] -= 1
+                logger.info(f"✅ Successfully retried chunk {chunk_id}")
+
             except Exception as e:
-                logger.error(f"Retry failed for chunk {chunk_id}: {e}")
+                error_msg = str(e)
+                logger.error(f"Retry failed for chunk {chunk_id}: {error_msg}")
+
+                # NEW: Handle quota error trong retry
+                if self.quota_handler:
+                    quota_error = self.quota_handler.is_quota_error(error_msg)
+
+                    if quota_error:
+                        logger.error(f"❌ Quota error khi retry chunk {chunk_id}")
+
+                        # Nếu là quota exceeded hoặc auth error, stop retry
+                        if quota_error.error_type in ['quota_exceeded', 'auth_error']:
+                            logger.error(
+                                "⛔ Dừng retry vì quota exceeded/auth error.\n"
+                                "Các chunk còn lại sẽ bị skip."
+                            )
+                            break  # Stop retrying remaining chunks
+
+                        # Nếu là rate limit, có thể pause và retry
+                        if quota_error.error_type == 'rate_limit':
+                            should_retry = self.quota_handler.handle_quota_error(
+                                quota_error,
+                                retry_attempt,
+                                on_pause=lambda delay, attempt, max_attempts: logger.info(
+                                    f"⏸️ Pausing for {delay}s (retry {attempt}/{max_attempts})"
+                                )
+                            )
+
+                            if should_retry:
+                                # Retry lại chunk này
+                                try:
+                                    translation = self._translate_single_chunk(
+                                        chunk, source_lang, target_lang
+                                    )
+                                    translations[chunk_id] = translation
+                                    self.stats['successful_chunks'] += 1
+                                    self.stats['failed_chunks'] -= 1
+                                    if self.skip_failed_chunks:
+                                        self.stats['skipped_chunks'] -= 1
+                                    logger.info(f"✅ Retry thành công sau pause: chunk {chunk_id}")
+                                except Exception as retry_e:
+                                    logger.error(f"Retry sau pause vẫn fail: {retry_e}")
+                            else:
+                                logger.error("⛔ Quá nhiều rate limit errors, dừng retry")
+                                break
+
+                retry_attempt += 1
 
     def _log_stats(self):
         """Log thống kê"""
