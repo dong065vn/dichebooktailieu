@@ -34,6 +34,38 @@ Một extension/công cụ Python mạnh mẽ để dịch sách từ tiếng An
 - **Nguồn**: English, Chinese (中文), Russian (Русский)
 - **Đích**: Vietnamese (Tiếng Việt)
 
+## 🎨 Web UI - Giao Diện Đồ Họa (Mới!)
+
+Bây giờ có **giao diện web hiện đại** - không cần dòng lệnh!
+
+### 🚀 Chạy Web UI
+
+```bash
+# Gradio UI (Khuyến nghị - đẹp, dễ dùng)
+python ui_gradio.py
+
+# Hoặc Streamlit UI
+streamlit run ui_streamlit.py
+
+# Hoặc dùng launcher
+./run_ui.sh        # Linux/Mac
+run_ui.bat         # Windows
+```
+
+Mở trình duyệt: **http://localhost:7860** (Gradio) hoặc **http://localhost:8501** (Streamlit)
+
+**Tính năng UI:**
+- ✅ Drag & drop upload file
+- ✅ Chọn provider qua dropdown
+- ✅ Progress bar real-time
+- ✅ Download file đã dịch
+- ✅ Hiển thị statistics
+- ✅ Responsive design (mobile-friendly)
+
+Xem chi tiết: **[UI_GUIDE.md](UI_GUIDE.md)**
+
+---
+
 ## 🚀 Cài Đặt
 
 ### Yêu Cầu
@@ -47,7 +79,7 @@ Một extension/công cụ Python mạnh mẽ để dịch sách từ tiếng An
 git clone https://github.com/yourusername/book-translator.git
 cd book-translator
 
-# Cài đặt dependencies
+# Cài đặt dependencies (bao gồm UI)
 pip install -r requirements.txt
 
 # Hoặc cài đặt như package
