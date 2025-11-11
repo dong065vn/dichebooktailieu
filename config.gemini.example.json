@@ -1,0 +1,14 @@
+{
+  "llm_provider": "google",
+  "model": "gemini-1.5-pro",
+  "api_key": "YOUR_GOOGLE_API_KEY_HERE",
+  "max_workers": 5,
+  "max_chunk_size": 3000,
+  "min_chunk_size": 500,
+  "context_size": 300,
+  "temperature": 0.3,
+  "max_tokens": 4000,
+  "source_lang": "english",
+  "target_lang": "vietnamese",
+  "show_progress": true
+}

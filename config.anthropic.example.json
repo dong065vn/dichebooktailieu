@@ -1,0 +1,14 @@
+{
+  "llm_provider": "anthropic",
+  "model": "claude-3-5-sonnet-20241022",
+  "api_key": "YOUR_ANTHROPIC_API_KEY_HERE",
+  "max_workers": 5,
+  "max_chunk_size": 3000,
+  "min_chunk_size": 500,
+  "context_size": 300,
+  "temperature": 0.3,
+  "max_tokens": 4000,
+  "source_lang": "english",
+  "target_lang": "vietnamese",
+  "show_progress": true
+}
